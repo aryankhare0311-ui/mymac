@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Futurepedia — AI Neural Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #03050f;
+  --bg-card: #080d1a;
+  --cyan: #00d4ff;
+  --violet: #7b2fff;
+  --text: #e8f4ff;
+  --text-sub: #6a8aab;
+  --border: rgba(0,212,255,0.18);
+  --border-hover: rgba(0,212,255,0.65);
+}
+
+html, body {
+  width: 100%; height: 100%;
+  background: var(--bg);
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+canvas#bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+#app {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100vw;
+  height: 100vh;
+}
+
+#graph {
+  position: relative;
+  width: min(90vw, 90vh);
+  height: min(90vw, 90vh);
+}
+
+#graph-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+/* ── Central node ── */
+#center-node {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: clamp(88px, 14vmin, 116px);
+  height: clamp(88px, 14vmin, 116px);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #0d1f3a, #03050f);
+  border: 2px solid var(--cyan);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  animation: breathe 3s ease-in-out infinite alternate;
+  z-index: 10;
+  cursor: default;
+  user-select: none;
+}
+
+#center-node .fp-monogram {
+  font-size: clamp(20px, 3.5vmin, 28px);
+  font-weight: 700;
+  color: var(--cyan);
+  letter-spacing: -0.02em;
+  line-height: 1;
+  text-shadow: 0 0 12px var(--cyan);
+}
+
+#center-node .fp-label {
+  font-size: clamp(6px, 1.1vmin, 9px);
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+@keyframes breathe {
+  from { box-shadow: 0 0 16px var(--cyan), 0 0 32px rgba(0,212,255,0.2), inset 0 0 12px rgba(0,212,255,0.05); }
+  to   { box-shadow: 0 0 40px var(--cyan), 0 0 80px rgba(0,212,255,0.35), inset 0 0 20px rgba(0,212,255,0.1); }
+}
+
+/* ── Outer nodes ── */
+.link-node {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: clamp(72px, 11vmin, 94px);
+  height: clamp(72px, 11vmin, 94px);
+  border-radius: 16px;
+  background: rgba(8,13,26,0.92);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(8px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  text-decoration: none;
+  color: var(--text);
+  cursor: pointer;
+  transition: transform 0.22s ease-out, box-shadow 0.22s ease-out, border-color 0.22s ease-out;
+  z-index: 10;
+  opacity: 0;
+  animation: fadeIn 0.6s ease-out forwards;
+}
+
+.link-node:hover, .link-node.touch-active {
+  transform: translate(-50%, -50%) scale(1.13);
+  border-color: var(--node-accent, var(--cyan));
+  box-shadow: 0 0 20px var(--node-accent, var(--cyan)), 0 0 50px color-mix(in srgb, var(--node-accent, var(--cyan)) 30%, transparent);
+}
+
+.link-node .node-icon { flex-shrink: 0; }
+.link-node .node-icon svg { display: block; }
+
+.link-node .node-name {
+  font-size: clamp(8px, 1.2vmin, 10.5px);
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.link-node .node-sub {
+  font-size: clamp(6.5px, 1vmin, 9px);
+  color: var(--text-sub);
+  text-align: center;
+  line-height: 1;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.85); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+/* ── SVG edges ── */
+.edge-base {
+  stroke: var(--cyan);
+  stroke-opacity: 0.15;
+  stroke-width: 1;
+  fill: none;
+  transition: stroke-opacity 0.22s, stroke 0.22s;
+}
+
+.edge-base.ring {
+  stroke: var(--violet);
+  stroke-opacity: 0.12;
+}
+
+.edge-base.active {
+  stroke-opacity: 0.6;
+  stroke: var(--node-edge-color, var(--cyan));
+}
+
+.edge-pulse {
+  fill: none;
+  stroke-linecap: round;
+  stroke-width: 2.5;
+  animation: pulseLine var(--dur, 2.4s) linear infinite var(--delay, 0s);
+  stroke-dasharray: 10 1000;
+  stroke-dashoffset: var(--len, 1000);
+}
+
+.edge-pulse.forward { stroke: var(--cyan); stroke-opacity: 0.7; }
+.edge-pulse.reverse { stroke: var(--violet); stroke-opacity: 0.5; animation-direction: reverse; }
+
+.edge-pulse.active.forward { stroke: var(--node-edge-color, var(--cyan)); stroke-opacity: 0.95; stroke-width: 3.5; stroke-dasharray: 16 1000; }
+.edge-pulse.active.reverse { stroke: var(--node-edge-color, var(--cyan)); stroke-opacity: 0.7; stroke-width: 3; }
+
+@keyframes pulseLine {
+  from { stroke-dashoffset: var(--len, 1000); }
+  to   { stroke-dashoffset: 0; }
+}
+
+/* ── Responsive ── */
+@media (max-width: 380px) {
+  #graph { width: 96vw; height: 96vw; }
+}
+</style>
+</head>
+<body>
+
+<canvas id="bg"></canvas>
+
+<div id="app">
+  <div id="graph">
+    <svg id="graph-svg" viewBox="0 0 1000 1000" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="glow-filter" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="3" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+      <!-- edges injected by JS -->
+    </svg>
+
+    <!-- Central node -->
+    <div id="center-node">
+      <span class="fp-monogram">FP</span>
+      <span class="fp-label">Futurepedia</span>
+    </div>
+
+    <!-- YouTube -->
+    <a class="link-node" id="node-yt" href="https://www.youtube.com/@Futurepedia" target="_blank" rel="noopener"
+       style="--node-accent:#ff2d2d; animation-delay:0.1s">
+      <span class="node-icon">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+          <path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.96C18.88 4 12 4 12 4s-6.88 0-8.59.46A2.78 2.78 0 0 0 1.46 6.42 29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58 2.78 2.78 0 0 0 1.95 1.96C5.12 20 12 20 12 20s6.88 0 8.59-.46a2.78 2.78 0 0 0 1.95-1.96A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z" fill="#FF0000"/>
+          <polygon points="9.75,15.02 15.5,12 9.75,8.98 9.75,15.02" fill="white"/>
+        </svg>
+      </span>
+      <span class="node-name">YouTube</span>
+      <span class="node-sub">@Futurepedia</span>
+    </a>
+
+    <!-- Futurepedia Website -->
+    <a class="link-node" id="node-web" href="https://www.futurepedia.io" target="_blank" rel="noopener"
+       style="--node-accent:#00d4ff; animation-delay:0.2s">
+      <span class="node-icon">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="10" stroke="#00d4ff" stroke-width="1.5"/>
+          <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" stroke="#00d4ff" stroke-width="1.5"/>
+        </svg>
+      </span>
+      <span class="node-name">Website</span>
+      <span class="node-sub">futurepedia.io</span>
+    </a>
+
+    <!-- Newsletter -->
+    <a class="link-node" id="node-nl" href="https://www.futurepedia.io/newsletter" target="_blank" rel="noopener"
+       style="--node-accent:#7b2fff; animation-delay:0.3s">
+      <span class="node-icon">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+          <rect x="2" y="4" width="20" height="16" rx="2" stroke="#7b2fff" stroke-width="1.5"/>
+          <path d="M2 8l10 7 10-7" stroke="#7b2fff" stroke-width="1.5"/>
+        </svg>
+      </span>
+      <span class="node-name">Newsletter</span>
+      <span class="node-sub">Free Weekly</span>
+    </a>
+
+    <!-- Instagram -->
+    <a class="link-node" id="node-ig" href="https://www.instagram.com/futurepedia_" target="_blank" rel="noopener"
+       style="--node-accent:#e1306c; animation-delay:0.4s">
+      <span class="node-icon">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+          <rect x="2" y="2" width="20" height="20" rx="5" stroke="url(#ig-grad)" stroke-width="1.5"/>
+          <circle cx="12" cy="12" r="5" stroke="url(#ig-grad)" stroke-width="1.5"/>
+          <circle cx="17.5" cy="6.5" r="1" fill="#e1306c"/>
+          <defs>
+            <linearGradient id="ig-grad" x1="2" y1="22" x2="22" y2="2" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#f09433"/>
+              <stop offset="25%" stop-color="#e6683c"/>
+              <stop offset="50%" stop-color="#dc2743"/>
+              <stop offset="75%" stop-color="#cc2366"/>
+              <stop offset="100%" stop-color="#bc1888"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </span>
+      <span class="node-name">Instagram</span>
+      <span class="node-sub">@futurepedia_</span>
+    </a>
+
+    <!-- Twitter/X -->
+    <a class="link-node" id="node-x" href="https://twitter.com/Futurepedia_" target="_blank" rel="noopener"
+       style="--node-accent:#1d9bf0; animation-delay:0.5s">
+      <span class="node-icon">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="#e8f4ff">
+          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.748l7.73-8.835L1.254 2.25H8.08l4.254 5.622L18.244 2.25zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z"/>
+        </svg>
+      </span>
+      <span class="node-name">Twitter / X</span>
+      <span class="node-sub">@Futurepedia_</span>
+    </a>
+
+    <!-- Skill Leap AI -->
+    <a class="link-node" id="node-sl" href="https://www.skillleap.ai" target="_blank" rel="noopener"
+       style="--node-accent:#f7931e; animation-delay:0.6s">
+      <span class="node-icon">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+          <path d="M12 2L2 7l10 5 10-5-10-5z" stroke="#f7931e" stroke-width="1.5" stroke-linejoin="round"/>
+          <path d="M2 17l10 5 10-5" stroke="#f7931e" stroke-width="1.5" stroke-linejoin="round"/>
+          <path d="M2 12l10 5 10-5" stroke="#f7931e" stroke-width="1.5" stroke-linejoin="round"/>
+        </svg>
+      </span>
+      <span class="node-name">Skill Leap AI</span>
+      <span class="node-sub">Course Platform</span>
+    </a>
+  </div>
+</div>
+
+<script>
+// ── Node definitions ──────────────────────────────────────────────────────────
+const NODES = [
+  { id: 'node-yt',  pct: [50, 12],  accent: '#ff2d2d' },
+  { id: 'node-web', pct: [83, 31],  accent: '#00d4ff' },
+  { id: 'node-nl',  pct: [83, 69],  accent: '#7b2fff' },
+  { id: 'node-ig',  pct: [50, 88],  accent: '#e1306c' },
+  { id: 'node-x',   pct: [17, 69],  accent: '#1d9bf0' },
+  { id: 'node-sl',  pct: [17, 31],  accent: '#f7931e' },
+];
+
+// Edge topology: [fromIndex, toIndex] — -1 = center
+// 6 radial (center→each) + 6 ring (each→next)
+const EDGE_DEFS = [
+  [-1, 0], [-1, 1], [-1, 2], [-1, 3], [-1, 4], [-1, 5],
+  [0, 1],  [1, 2],  [2, 3],  [3, 4],  [4, 5],  [5, 0],
+];
+
+const svg = document.getElementById('graph-svg');
+const graph = document.getElementById('graph');
+const CENTER_PCT = [50, 50];
+
+let edgeEls = []; // { base, fwd, rev, nodeIndices }
+
+function pctToSvg(px, py) {
+  return [px * 10, py * 10]; // viewBox 0-1000
+}
+
+function buildEdges() {
+  svg.querySelectorAll('.edge-group').forEach(e => e.remove());
+  edgeEls = [];
+
+  EDGE_DEFS.forEach(([a, b], i) => {
+    const [ax, ay] = pctToSvg(...(a === -1 ? CENTER_PCT : NODES[a].pct));
+    const [bx, by] = pctToSvg(...(b === -1 ? CENTER_PCT : NODES[b].pct));
+    const len = Math.hypot(bx - ax, by - ay);
+    const isRing = a !== -1;
+    const dur = (1.8 + (i % 6) * 0.24).toFixed(2);
+    const delay = ((i * 0.37) % 2.2).toFixed(2);
+
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.classList.add('edge-group');
+
+    const base = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    base.classList.add('edge-base');
+    if (isRing) base.classList.add('ring');
+    setLine(base, ax, ay, bx, by);
+
+    const fwd = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    fwd.classList.add('edge-pulse', 'forward');
+    fwd.style.setProperty('--len', len);
+    fwd.style.setProperty('--dur', dur + 's');
+    fwd.style.setProperty('--delay', delay + 's');
+    setLine(fwd, ax, ay, bx, by);
+
+    const rev = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    rev.classList.add('edge-pulse', 'reverse');
+    rev.style.setProperty('--len', len);
+    rev.style.setProperty('--dur', (parseFloat(dur) * 1.4).toFixed(2) + 's');
+    rev.style.setProperty('--delay', (parseFloat(delay) + 0.9).toFixed(2) + 's');
+    setLine(rev, ax, ay, bx, by);
+
+    g.appendChild(base);
+    g.appendChild(fwd);
+    g.appendChild(rev);
+    svg.appendChild(g);
+    edgeEls.push({ base, fwd, rev, nodeIndices: [a, b] });
+  });
+}
+
+function setLine(el, x1, y1, x2, y2) {
+  el.setAttribute('x1', x1); el.setAttribute('y1', y1);
+  el.setAttribute('x2', x2); el.setAttribute('y2', y2);
+}
+
+// ── Hover interactions ────────────────────────────────────────────────────────
+function getConnectedEdges(nodeIndex) {
+  return edgeEls.filter(e => e.nodeIndices.includes(nodeIndex));
+}
+
+NODES.forEach((node, idx) => {
+  const el = document.getElementById(node.id);
+
+  function activate() {
+    const edges = getConnectedEdges(idx);
+    edges.forEach(({ base, fwd, rev }) => {
+      const color = node.accent;
+      base.classList.add('active');
+      base.style.setProperty('--node-edge-color', color);
+      fwd.classList.add('active');
+      fwd.style.setProperty('--node-edge-color', color);
+      rev.classList.add('active');
+      rev.style.setProperty('--node-edge-color', color);
+    });
+  }
+
+  function deactivate() {
+    getConnectedEdges(idx).forEach(({ base, fwd, rev }) => {
+      base.classList.remove('active');
+      fwd.classList.remove('active');
+      rev.classList.remove('active');
+    });
+  }
+
+  el.addEventListener('mouseenter', activate);
+  el.addEventListener('mouseleave', deactivate);
+
+  el.addEventListener('touchstart', (e) => {
+    el.classList.add('touch-active');
+    activate();
+  }, { passive: true });
+
+  el.addEventListener('touchend', () => {
+    setTimeout(() => {
+      el.classList.remove('touch-active');
+      deactivate();
+    }, 400);
+  });
+});
+
+// ── Background canvas ─────────────────────────────────────────────────────────
+class NeuralBackground {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.particles = [];
+    this.maxDist = 140;
+    this.raf = null;
+    this.resize();
+    window.addEventListener('resize', () => this.resize());
+  }
+
+  resize() {
+    this.canvas.width = window.innerWidth;
+    this.canvas.height = window.innerHeight;
+    const count = Math.min(80, Math.floor(this.canvas.width * this.canvas.height / 13000));
+    this.particles = Array.from({ length: count }, () => ({
+      x: Math.random() * this.canvas.width,
+      y: Math.random() * this.canvas.height,
+      vx: (Math.random() - 0.5) * 0.28,
+      vy: (Math.random() - 0.5) * 0.28,
+      r: Math.random() * 1.4 + 0.4,
+    }));
+  }
+
+  draw() {
+    const { ctx, canvas, particles, maxDist } = this;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+      p.x += p.vx; p.y += p.vy;
+      if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+      if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0,212,255,0.4)';
+      ctx.fill();
+
+      for (let j = i + 1; j < particles.length; j++) {
+        const q = particles[j];
+        const d = Math.hypot(p.x - q.x, p.y - q.y);
+        if (d < maxDist) {
+          ctx.beginPath();
+          ctx.moveTo(p.x, p.y);
+          ctx.lineTo(q.x, q.y);
+          ctx.strokeStyle = `rgba(0,212,255,${0.055 * (1 - d / maxDist)})`;
+          ctx.lineWidth = 0.6;
+          ctx.stroke();
+        }
+      }
+    }
+    this.raf = requestAnimationFrame(() => this.draw());
+  }
+}
+
+// ── Position HTML nodes ───────────────────────────────────────────────────────
+function positionNodes() {
+  NODES.forEach(node => {
+    const el = document.getElementById(node.id);
+    el.style.left = node.pct[0] + '%';
+    el.style.top  = node.pct[1] + '%';
+  });
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+positionNodes();
+buildEdges();
+new NeuralBackground(document.getElementById('bg')).draw();
+</script>
+</body>
+</html>
